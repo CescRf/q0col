@@ -87,7 +87,7 @@ datatable(bd_table, rownames = FALSE,
 
 # Cobertura de la mortalidad infantil
 
-## columna
+## Columna 1 {width=60%}
 
 ```{r}
 
@@ -112,3 +112,26 @@ ggplot()+
 ggplotly(gr2)
 ```
 
+## Columna 2 {width=40%}
+```{r}
+#| scrollable: true
+
+# Tabla de cocientes de cobertura
+bd2_table <- bd2 %>%
+  .[!is.na(Vit_ProyDane)] %>%
+  .[, .(Año, Vit_ProyDane, Vit_ProyWPP)] %>%
+  setnames(., c("Vit_ProyDane", "Vit_ProyWPP"), 
+           c("K (Vitales/DANE)", "K (Vitales/WPP2024)"))
+
+datatable(bd2_table, rownames = FALSE,
+          options = list(pageLength = 10, scrollY = "450px",
+              rowCallback = JS(
+                "function(row, data) {",
+                "  for (var i = 0; i < row.childElementCount; i++) {",
+                "    row.children[i].style.fontSize = '16px';",
+                "  }",
+                "}"
+              )),
+          caption = 'Tabla de Cocientes de Cobertura') %>%
+  formatRound(columns = c('K (Vitales/DANE)', 'K (Vitales/WPP2024)'), digits = 2)
+```

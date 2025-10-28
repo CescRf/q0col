@@ -1,0 +1,114 @@
+---
+title: "Análisis de Tasa de Mortalidad Infantil (TMI) de Colombia"
+author: "César Cristancho-Fajardo"
+format: 
+  dashboard:
+    orientation: columns
+---
+
+# Mortalidad infantil nacional
+
+```{r}
+#| cache: false
+#| message: false
+#| warning: false
+ 
+library(data.table)
+library(tidyverse)
+library(plotly)
+library(DT)
+
+setwd("C:/Users/User/OneDrive - dane.gov.co/excel_word_2024/dane2025vd/calculo mortalidad infantil/q0v2paper")
+
+bd <- fread('COL-Infant mortality rate-Total-datasources-download.csv') %>%
+  setnames(.,c("Name", "Obs status", "Category", "AoW & TSFB", "Int.", "Method", 
+               "Ref. date", "Value", "Std. err"),
+           c("Nombre", "Estatus", "Categoria", "AoW & TSFB", "Int.", "Método", 
+             "Año", "Tasa de mortalidad infantil", "Std. err") ) %>%
+  .[,Categoria:=fct_recode(Categoria,   "UNIGME"="VRUNIGME", 
+                      "Censos"="Census", "Encuestas"="DHSDIR", 
+                      "Encuestas"="DHSINDIR",  "Encuestas"="Others", 
+                      "Encuestas"="WFS",   "VR"="VR", 
+                      "ProyPobDANE2025"="ProyPobNSO",  "ProyPobWPP2024"="ProyPobWPP2024", 
+                      "VitDANE"="VRDANE"  )]%>%
+  .[Año %in% 1950:2024 & !(Categoria %in% c("VR", "VRUNIGME") )] 
+
+
+gr <- ggplot() +
+  geom_point(data=bd[Categoria %in% c("Censos", "Encuestas")],
+             aes(Año, `Tasa de mortalidad infantil`) , colour = 'gray') +
+  geom_line(data=bd[Categoria %in% c("ProyPobDANE2025", "ProyPobWPP2024", "VitDANE")],
+             aes(Año, `Tasa de mortalidad infantil`, colour = Categoria), linewidth = 1.5) +
+  scale_y_continuous(limits = c(0,130), breaks=seq(0, 120, 20))  +
+  scale_x_continuous(breaks=seq(1950, 2025, 10)) +
+  scale_colour_manual(name='', values=c('#00468B','#AD002A','#42B540'))+
+  theme(legend.position = c(.75, .7), legend.background = element_rect(fill = "transparent"))
+
+```
+
+## Columna 1 {width=60%}
+
+```{r}
+#| cache: TRUE
+#| message: false
+#| warning: false
+#| fig-cap: "Gráfico de Serie de TMI (Interactivo)"
+
+# Muestra el gráfico interactivo en la primera columna
+ggplotly(gr)
+```
+
+## Columna 2 {width=40%}
+```{r}
+#| scrollable: true
+
+# Seleccionamos las columnas relevantes y mostramos en una tabla interactiva
+bd_table <- bd[Categoria %in% c("ProyPobDANE2025", "ProyPobWPP2024", "VitDANE")] %>% 
+  .[ , .(Año, `Tasa de mortalidad infantil`, Categoria)] %>% 
+  .[ , `Tasa de mortalidad infantil`:= round(`Tasa de mortalidad infantil`,2)] %>%
+  setnames(., "Categoria", "Fuente") %>%
+  setorder(Año, Fuente)  %>%
+  dcast.data.table(., Año ~ Fuente, value.var = "Tasa de mortalidad infantil")
+
+datatable(bd_table, rownames = FALSE,
+          options = list( pageLength = 10,  scrollY = "450px",
+              rowCallback = JS(
+                "function(row, data) {",
+                "  for (var i = 0; i < row.childElementCount; i++) {",
+                "    row.children[i].style.fontSize = '16px';", # Cambia '10px' al tamaño deseado
+                "  }",
+                "}"
+              ) ),
+          caption = 'Tabla de Datos Fuente (Proyecciones y Observaciones)') 
+```
+
+
+
+
+# Cobertura de la mortalidad infantil
+
+## columna
+
+```{r}
+
+bd2 <- bd[!(Categoria %in% c("Censos", "Encuestas") ),.(Año , `Tasa de mortalidad infantil`, Categoria)] %>%
+  dcast(., Año ~ Categoria, value.var='Tasa de mortalidad infantil', sum) %>%
+  .[,let(Vit_ProyDane = round(VitDANE / ProyPobDANE2025, 2),
+         Vit_ProyWPP = round(VitDANE / ProyPobWPP2024, 2) )] %>%
+  .[ProyPobDANE2025==0,Vit_ProyDane:=NA]
+
+gr2 <-
+ggplot()+
+  geom_hline(yintercept = 1, linetype='dashed', colour = 'gray') +
+  geom_line(data=bd2 ,aes(Año, Vit_ProyDane, colour = 'q0(Vitales) / q0(Proyección DANE)'),
+            linewidth = 1.5)+ 
+  geom_line(data=bd2 ,aes(Año, Vit_ProyWPP, colour = 'q0(Vitales) / q0(Proyección WPP2024)'), linewidth = 1.5) +
+  scale_colour_manual(name='', values=c('#00468B','#AD002A'))+
+  scale_y_continuous(name = 'Cocientes K', limits = c(0,1.2), breaks=seq(0,1.2,.2))+
+  scale_x_continuous(breaks=seq(1950, 2025, 10)) +
+  theme(legend.position = 'bottom') +
+  guides(color = guide_legend(ncol = 1))
+
+ggplotly(gr2)
+```
+
